@@ -1,0 +1,45 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Audio Task Manager</title>
+</head>
+<body>
+
+    <main id="app">
+        <h1 id="title">Audio Task Manager</h1>
+        <p class="description">Панель обработки запросов</p>
+
+        <section id="requests">
+            <h2>Список запросов</h2>
+
+            <div class="request" data-id="1">
+                <h3>Запрос #1</h3>
+                <p class="name">Запись интервью</p>
+                <p class="status">pending</p>
+            </div>
+
+            <div class="request" data-id="2">
+                <h3>Запрос #2</h3>
+                <p class="name">Голосовое сообщение</p>
+                <p class="status">done</p>
+            </div>
+
+            <div class="request" data-id="3">
+                <h3>Запрос #3</h3>
+                <p class="name">Запись лекции</p>
+                <p class="status">pending</p>
+            </div>
+        </section>
+
+        <section id="info">
+            <h2>Информация</h2>
+            <p id="total">Всего запросов: 0</p>
+            <p id="selected">Выбранный запрос: отсутствует</p>
+        </section>
+    </main>
+
+    <script src="main.js"></script>
+</body>
+</html>
