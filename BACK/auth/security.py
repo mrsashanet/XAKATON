@@ -26,9 +26,9 @@ def create_acsess_token(user_id:int)->str:
 
 def decode_acsess_token(token:str)->int|None:
     try:
-        playroad=decode(token,SECRET_KEY,algorithm=[ALGORITHM])
+        playroad=decode(token,SECRET_KEY,algorithms=[ALGORITHM])
         return int(playroad['sub'])
-    except:
+    except(InvalidTokenError, KeyError, ValueError):
         return None
 
 
