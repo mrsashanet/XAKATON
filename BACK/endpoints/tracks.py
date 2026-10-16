@@ -50,6 +50,39 @@ def add_track(data: TrackCreate, db: Session = Depends(get_db), user: User = Dep
     db.refresh(track)
     return track
 
+@router.post("/{track_id}/vote", response_model=VoteOut)
+def vote(track_id: int, data: VoteCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> VoteOut:
+
+    track = db.get(Track, track_id)
+    if track is None:
+        raise HTTPException(status_code=404, detail="Трек не найден")
+
+    membership = db.scalar(
+        select(Membership).where(
+            Membership.user_id == user.id,
+            Membership.community_id == track.community_id))
+
+    if membership is None:
+        raise HTTPException(status_code=403, detail="вы не являетесь участником группы")
+    #Проверка голосовал ли пользователь
+    existing = db.scalar(select(Vote).where(Vote.user_id == user.id ,Vote.track_id == track_id))
+
+    if existing:
+        existing.value = data.value
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    vote = Vote(user_id=user.id,track_id=track_id,value=data.value)
+
+    db.add(vote)
+    db.commit()
+    db.refresh(vote)
+    return vote
+
+
+
+
 
 
 
