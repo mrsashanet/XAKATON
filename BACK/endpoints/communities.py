@@ -1,3 +1,5 @@
+from enum import member
+
 from schemas.communities import CommunityRead, CommunityCreate, CommunityCreated
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
@@ -7,8 +9,9 @@ from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 from dependencies import get_current_user
 from schemas.communities import CommunityJoin
+from schemas.tracks import TrackWithScore
 from database import get_db
-from models import Community, Membership, User
+from models import Community, Membership, User, Track, Vote
 
 
 router = APIRouter(
@@ -130,9 +133,38 @@ def join_community(
             raise
     return get_community(community.id, db, user)
 
+@router.get("/{community_id}/playlist", response_model=list[TrackWithScore])
+def get_playlist(
+        community_id: int,
+        db: Session = Depends(get_db),
+        user: User = Depends(get_current_user),
+) -> list[TrackWithScore]:
+    community = db.get(Community, community_id)
+    if community is None:
+        raise HTTPException(status_code=404, detail="Сообщество не найдено")
 
+    membership = db.scalar(
+        select(Membership).where(
+            Membership.user_id == user.id,
+            Membership.community_id == community_id,
+        )
+    )
 
-        
-    
+    if membership is None:
+        raise HTTPException(status_code=403, detail="Вы не являетесь участником группы")
+
+    result = db.execute(
+        select(
+            Track,
+            func.coalesce(func.sum(Vote.value), 0).label("score"),
+        )
+        .outerjoin(Vote, Vote.track_id == Track.id)
+        .where(Track.community_id == community_id)
+        .group_by(Track.id)
+        .order_by(func.coalesce(func.sum(Vote.value), 0).desc())
+    ).all()
+
+    return[TrackWithScore(id = t.id, title=t.title, artist=t.artist,score=score) for t, score in result]
+
     
 
