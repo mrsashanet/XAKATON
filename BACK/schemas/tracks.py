@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class TrackCreate(BaseModel):
     title: str = Field(min_length=1, max_length=128)
     artist: str = Field(min_length=1, max_length=128)
+    community_id: int
 
 class TrackOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
