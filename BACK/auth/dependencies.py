@@ -1,13 +1,11 @@
-import token
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from sqlalchemy.sql.functions import user
 
 from database import get_db
 from models import User
-from auth.security import decode_acsess_token
+from auth.security import decode_access_token
 
 ...
 
@@ -23,7 +21,7 @@ def get_current_user(
         detail="не удалось проверить токен",
         headers={"WWW-Authenticate": "Bearer"}, )
 
-    user_id = decode_acsess_token(token)
+    user_id = decode_access_token(token)
     if user_id is None:
         raise credentials_error
     user = db.get(User, user_id)

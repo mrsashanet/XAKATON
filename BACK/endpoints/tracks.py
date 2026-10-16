@@ -6,16 +6,9 @@ from sqlalchemy import func, select
 from database import get_db
 from models import Track, Vote, Membership, Community, User
 from schemas.tracks import TrackCreate, TrackOut, TrackWithScore, VoteCreate, VoteOut
-#from auth.dependencies import get_current_user
+from auth.dependencies import get_current_user
 
 router = APIRouter(prefix="/tracks", tags=["tracks"])
-
-def get_current_user(db: Session = Depends(get_db)) -> User:
-    """Временная заглушка: всегда возвращает первого пользователя из БД."""
-    user = db.scalar(select(User).limit(1))
-    if user is None:
-        raise HTTPException(status_code=401, detail="Нет пользователей в БД — запусти seed.py")
-    return user
 
 @router.get("/{track_id}", response_model=TrackOut)
 def get_track(track_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> TrackOut:

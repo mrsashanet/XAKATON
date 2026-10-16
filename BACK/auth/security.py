@@ -19,16 +19,16 @@ def verify_password(password: str, hashed: str) -> bool:
     return password_hash.verify(password, hashed)
 
 
-def create_acsess_token(user_id:int)->str:
+def create_access_token(user_id:int)->str:
     expire=datetime.now(timezone.utc)+timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
     playroad={'sub':str(user_id),"exp":expire}
     return encode(playroad,SECRET_KEY,algorithm=ALGORITHM)
 
-def decode_acsess_token(token:str)->int|None:
+def decode_access_token(token:str)->int|None:
     try:
         playroad=decode(token,SECRET_KEY,algorithms=[ALGORITHM])
         return int(playroad['sub'])
-    except:
+    except(InvalidTokenError, KeyError, ValueError):
         return None
 
 
