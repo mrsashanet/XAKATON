@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from endpoints import communities, tracks
 import auth.dependencies, auth.security
 import models
+from auth import router
 from database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -20,3 +21,4 @@ app.add_middleware(
 )
 app.include_router(communities.router)
 app.include_router(tracks.router)
+app.include_router(router.router)
