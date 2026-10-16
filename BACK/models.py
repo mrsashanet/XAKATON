@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -27,6 +27,7 @@ class Community(Base):
 
 class Membership(Base):
     __tablename__ = "memberships"
+    __table_args__ = (Index("uq_membership_user_community","user_id", "community_id", unique = True),)
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     community_id = Column(Integer, ForeignKey("communities.id"), nullable=False, index=True)

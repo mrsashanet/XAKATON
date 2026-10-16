@@ -1,0 +1,170 @@
+from enum import member
+
+from schemas.communities import CommunityRead, CommunityCreate, CommunityCreated
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from secrets import token_urlsafe
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+
+from dependencies import get_current_user
+from schemas.communities import CommunityJoin
+from schemas.tracks import TrackWithScore
+from database import get_db
+from models import Community, Membership, User, Track, Vote
+
+
+router = APIRouter(
+    prefix="/communities",
+    tags =["Сообщества"]
+
+)
+
+@router.get("/{community_id}", response_model = CommunityRead)
+def get_community(community_id: int,
+                   db: Session = Depends(get_db),
+                   user : User = Depends(get_current_user)) -> CommunityRead:
+    community = db.get(Community, community_id)
+
+    if community is None:
+        raise HTTPException(status_code = 404, detail = "Сообщество не найдено")
+
+    membership = db.scalar(
+        select(Membership).
+        where(Membership.community_id == community_id,
+            Membership.user_id == user.id)
+            )
+    if membership is None:
+        raise HTTPException(
+            status_code = 403,
+            detail = "Вы не являетесь участником группы"
+        )
+
+    
+    members_count = db.scalar(
+        select(func.count())
+        .select_from(Membership)
+        .where(Membership.community_id == community_id))
+    
+    return CommunityRead(
+        id = community_id,
+        name = community.com_name,
+        description = None,
+        owner_id = community.owner_id,
+        members_count = members_count
+    )
+
+@router.post("", response_model = CommunityCreated, status_code = 201)
+def create_community(
+    data: CommunityCreate,
+    db: Session = Depends(get_db), 
+    owner: User = Depends(get_current_user)) -> CommunityCreated:
+
+   
+    community = Community(
+        com_name = data.name,
+        invite_token = token_urlsafe(24),
+        owner_id = owner.id)
+
+    try:
+        db.add(community)
+        db.flush()
+
+        membership = Membership(
+            user_id = owner.id,
+            community_id = community.id
+        )
+        db.add(membership)
+
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    db.refresh(community)
+
+    return CommunityCreated(
+        id = community.id,
+        name = community.com_name,
+        description = None,
+        owner_id = community.owner_id,
+        members_count = 1,
+        invite_token = community.invite_token
+    )
+
+@router.post("/join", response_model = CommunityRead)
+def join_community(
+    data: CommunityJoin,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)) -> CommunityRead:
+
+    community = db.scalar(
+        select(Community).where(Community.invite_token == data.invite_token)
+    )
+
+    if community is None:
+        raise HTTPException(
+            status_code = 404,
+            detail = "Приглашение не найдено"
+        )
+
+    membership = db.scalar(
+        select(Membership).where(Membership.user_id == user.id,
+            Membership.community_id == community.id)
+    )
+
+    if membership is None:
+        try: 
+            db.add(
+                Membership(user_id = user.id, community_id = community.id )
+            )
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            membership = db.scalar(
+                select(Membership).
+                where(Membership.user_id == user.id,
+                     Membership.community_id == community.id
+                     )
+            )
+            if membership is None:
+                raise
+        except SQLAlchemyError:
+            db.rollback()
+            raise
+    return get_community(community.id, db, user)
+
+@router.get("/{community_id}/playlist", response_model=list[TrackWithScore])
+def get_playlist(
+        community_id: int,
+        db: Session = Depends(get_db),
+        user: User = Depends(get_current_user),
+) -> list[TrackWithScore]:
+    community = db.get(Community, community_id)
+    if community is None:
+        raise HTTPException(status_code=404, detail="Сообщество не найдено")
+
+    membership = db.scalar(
+        select(Membership).where(
+            Membership.user_id == user.id,
+            Membership.community_id == community_id,
+        )
+    )
+
+    if membership is None:
+        raise HTTPException(status_code=403, detail="Вы не являетесь участником группы")
+
+    result = db.execute(
+        select(
+            Track,
+            func.coalesce(func.sum(Vote.value), 0).label("score"),
+        )
+        .outerjoin(Vote, Vote.track_id == Track.id)
+        .where(Track.community_id == community_id)
+        .group_by(Track.id)
+        .order_by(func.coalesce(func.sum(Vote.value), 0).desc())
+    ).all()
+
+    return[TrackWithScore(id = t.id, title=t.title, artist=t.artist,score=score) for t, score in result]
+
+    
+
