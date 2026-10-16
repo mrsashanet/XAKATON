@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException
-from seed import community
 from sqlalchemy.orm import Session
 from sqlalchemy import func, select
 
