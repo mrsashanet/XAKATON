@@ -57,9 +57,7 @@ def create_community(
     db: Session = Depends(get_db), 
     owner: User = Depends(get_current_user)) -> CommunityCreated:
 
-    if owner is None:
-        raise HTTPException(status_code = 409, detail = "Тестовый пользователь с ID 1 ещё не создан")
-
+   
     community = Community(
         com_name = data.name,
         invite_token = token_urlsafe(24),
