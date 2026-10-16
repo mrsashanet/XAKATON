@@ -1,11 +1,14 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
+
 class CommunityCreate(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        extra="forbid",
+    )
 
     name: str = Field(min_length=1, max_length=100)
-    description: str | None = Field(default=None, max_length=1000)
 
 
 class CommunityRead(BaseModel):
@@ -14,3 +17,9 @@ class CommunityRead(BaseModel):
     description: str | None = None
     owner_id: int
     members_count: int = Field(ge=0)
+
+class CommunityCreated(CommunityRead):
+    invite_token: str
+
+class CommunityJoin(BaseModel):
+    invite_token: str = Field(min_length=1)

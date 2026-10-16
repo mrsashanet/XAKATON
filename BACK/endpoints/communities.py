@@ -1,41 +1,140 @@
-"""Учебные обработчики: данные хранятся в памяти до перезапуска."""
+from schemas.communities import CommunityRead, CommunityCreate, CommunityCreated
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from secrets import token_urlsafe
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
-from fastapi import APIRouter, HTTPException
-
-from communities.schemas import CommunityCreate, CommunityRead
-
-router = APIRouter(prefix="/communities", tags=["Сообщества"])
-
-# Временное хранилище для одного процесса; следующий шаг — общая БД.
-communities_store: dict[int, CommunityRead] = {
-    1: CommunityRead(
-        id=1,
-        name="Группа 123",
-        description="Общий плейлист группы 123",
-        owner_id=1,
-        members_count=1,
-    )
-}
+from dependencies import get_current_user
+from schemas.communities import CommunityJoin
+from database import get_db
+from models import Community, Membership, User
 
 
-@router.get("/{community_id}", response_model=CommunityRead)
-def get_community(community_id: int) -> CommunityRead:
-    community = communities_store.get(community_id)
+router = APIRouter(
+    prefix="/communities",
+    tags =["Сообщества"]
+
+)
+
+@router.get("/{community_id}", response_model = CommunityRead)
+def get_community(community_id: int,
+                   db: Session = Depends(get_db),
+                   user : User = Depends(get_current_user)) -> CommunityRead:
+    community = db.get(Community, community_id)
+
     if community is None:
-        raise HTTPException(status_code=404, detail="Сообщество не найдено")
-    return community
+        raise HTTPException(status_code = 404, detail = "Сообщество не найдено")
 
+    membership = db.scalar(
+        select(Membership).
+        where(Membership.community_id == community_id,
+            Membership.user_id == user.id)
+            )
+    if membership is None:
+        raise HTTPException(
+            status_code = 403,
+            detail = "Вы не являетесь участником группы"
+        )
 
-@router.post("", response_model=CommunityRead, status_code=201)
-def create_community(data: CommunityCreate) -> CommunityRead:
-    new_id = max(communities_store, default=0) + 1
-    community = CommunityRead(
-        id=new_id,
-        name=data.name,
-        description=data.description,
-        # Пока авторизация и таблица участников не подключены.
-        owner_id=1,
-        members_count=1,
+    
+    members_count = db.scalar(
+        select(func.count())
+        .select_from(Membership)
+        .where(Membership.community_id == community_id))
+    
+    return CommunityRead(
+        id = community_id,
+        name = community.com_name,
+        description = None,
+        owner_id = community.owner_id,
+        members_count = members_count
     )
-    communities_store[new_id] = community
-    return community
+
+@router.post("", response_model = CommunityCreated, status_code = 201)
+def create_community(
+    data: CommunityCreate,
+    db: Session = Depends(get_db), 
+    owner: User = Depends(get_current_user)) -> CommunityCreated:
+
+    if owner is None:
+        raise HTTPException(status_code = 409, detail = "Тестовый пользователь с ID 1 ещё не создан")
+
+    community = Community(
+        com_name = data.name,
+        invite_token = token_urlsafe(24),
+        owner_id = owner.id)
+
+    try:
+        db.add(community)
+        db.flush()
+
+        membership = Membership(
+            user_id = owner.id,
+            community_id = community.id
+        )
+        db.add(membership)
+
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    db.refresh(community)
+
+    return CommunityCreated(
+        id = community.id,
+        name = community.com_name,
+        description = None,
+        owner_id = community.owner_id,
+        members_count = 1,
+        invite_token = community.invite_token
+    )
+
+@router.post("/join", response_model = CommunityRead)
+def join_community(
+    data: CommunityJoin,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)) -> CommunityRead:
+
+    community = db.scalar(
+        select(Community).where(Community.invite_token == data.invite_token)
+    )
+
+    if community is None:
+        raise HTTPException(
+            status_code = 404,
+            detail = "Приглашение не найдено"
+        )
+
+    membership = db.scalar(
+        select(Membership).where(Membership.user_id == user.id,
+            Membership.community_id == community.id)
+    )
+
+    if membership is None:
+        try: 
+            db.add(
+                Membership(user_id = user.id, community_id = community.id )
+            )
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            membership = db.scalar(
+                select(Membership).
+                where(Membership.user_id == user.id,
+                     Membership.community_id == community.id
+                     )
+            )
+            if membership is None:
+                raise
+        except SQLAlchemyError:
+            db.rollback()
+            raise
+    return get_community(community.id, db, user)
+
+
+
+        
+    
+    
+
