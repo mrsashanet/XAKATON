@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from endpoints import communities
 import models
 from database import Base, engine
+from fastapi.middleware.cors import CORSMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -10,5 +11,10 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan = lifespan)
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 app.include_router(communities.router)
