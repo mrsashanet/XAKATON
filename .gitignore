@@ -10,3 +10,10 @@ __pycache__/
 **/.idea/
 .vscode/
 **/.vscode/
+
+node_modules/
+FRONT/dist/
+
+# Uploaded audio stays local; the original demo is shared with the team.
+/BACK/media/tracks/*
+!/BACK/media/tracks/Universe Voicee - First Light.mp3

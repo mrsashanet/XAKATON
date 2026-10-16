@@ -5,6 +5,7 @@ requires-python = ">=3.11"
 dependencies = [
     "aiosqlite>=0.22.1",
     "fastapi[standard]>=0.143.0",
+    "mutagen>=1.47.0",
     "passlib[bcrypt]>=1.7.4",
     "pwdlib[argon2]>=0.3.1",
     "pyjwt>=2.15.1",

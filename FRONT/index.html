@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#121612" />
+    <meta name="description" content="Universe Voicee — общий плейлист ваших людей. Предлагайте музыку, голосуйте и открывайте любимое вместе." />
+    <title>Universe Voicee — музыка, которой делятся</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="app"><div class="initial-loader" role="status">Universe Voicee<span></span></div></div>
+    <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+    <dialog id="modal" aria-labelledby="modal-title"></dialog>
+    <audio id="audio" preload="metadata"></audio>
+    <section id="player" class="audio-player" aria-label="Музыкальный плеер" hidden></section>
+    <script type="module" src="/src/app.js"></script>
+  </body>
+</html>

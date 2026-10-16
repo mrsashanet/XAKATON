@@ -3,7 +3,7 @@ from enum import member
 from schemas.communities import CommunityRead, CommunityCreate, CommunityCreated
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from secrets import token_urlsafe
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
@@ -157,14 +157,50 @@ def get_playlist(
         select(
             Track,
             func.coalesce(func.sum(Vote.value), 0).label("score"),
+            func.coalesce(func.sum(case((Vote.user_id == user.id, Vote.value), else_=0)), 0).label("my_vote"),
         )
         .outerjoin(Vote, Vote.track_id == Track.id)
         .where(Track.community_id == community_id)
         .group_by(Track.id)
-        .order_by(func.coalesce(func.sum(Vote.value), 0).desc())
+        .order_by(func.coalesce(func.sum(Vote.value), 0).desc(), Track.id.asc())
     ).all()
 
-    return[TrackWithScore(id = t.id, title=t.title, artist=t.artist,score=score) for t, score in result]
+    return[TrackWithScore(id = t.id, title=t.title, artist=t.artist,score=score, my_vote=my_vote, file_url=t.file_url, added_by=t.added_by) for t, score, my_vote in result]
 
     
 
+
+
+@router.get("", response_model=list[CommunityRead])
+def list_communities(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[CommunityRead]:
+    counts = (
+        select(Membership.community_id, func.count().label("members_count"))
+        .group_by(Membership.community_id)
+        .subquery()
+    )
+    rows = db.execute(
+        select(Community, counts.c.members_count)
+        .join(counts, counts.c.community_id == Community.id)
+        .where(Community.id.in_(
+            select(Membership.community_id).where(Membership.user_id == user.id)
+        ))
+        .order_by(Community.id.desc())
+    ).all()
+    return [CommunityRead(
+        id=community.id, name=community.com_name, owner_id=community.owner_id,
+        members_count=count, description=None,
+    ) for community, count in rows]
+
+
+@router.get("/{community_id}/invitation")
+def get_invitation(
+    community_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict[str, str]:
+    get_community(community_id, db, user)
+    community = db.get(Community, community_id)
+    return {"invite_token": community.invite_token}

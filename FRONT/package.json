@@ -1,0 +1,17 @@
+{
+  "name": "universe-voicee",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node dev.mjs",
+    "start": "node dev.mjs",
+    "build": "node build.mjs",
+    "preview": "node dev.mjs --dist",
+    "test": "node --test tests/*.test.js",
+    "check": "node --check src/app.js && node --check src/player.js && node --check src/workspace.js && node --check dev.mjs && node --check src/api/client.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

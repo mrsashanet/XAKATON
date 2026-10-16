@@ -35,10 +35,13 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     if (user is None) or (not verify_password(form.password, user.password)):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
-            "ты ввёл неверный логин или пароль, попробуй ещё раз)))",
+            "ты ввёл неверный логин или пароль, попробуй ещё раз))",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     return Token(access_token=create_access_token(user.id))
 
 
+@router.get("/me", response_model=UserOut)
+def me(current_user: User = Depends(get_current_user)) -> User:
+    return current_user

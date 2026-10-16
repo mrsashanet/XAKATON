@@ -24,6 +24,9 @@ class TrackWithScore(BaseModel):
     title: str
     artist: str
     score: int
+    my_vote: int = 0
+    file_url: str | None = None
+    added_by: int | None = None
 
 class VoteCreate(BaseModel):
     value: int = Field(ge=-1, le=1)
