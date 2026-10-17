@@ -1,9 +1,9 @@
 from enum import member
 
 from schemas.communities import CommunityRead, CommunityCreate, CommunityCreated
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Response
 from sqlalchemy.orm import Session
-from sqlalchemy import case, func, select
+from sqlalchemy import case, delete, func, select
 from secrets import token_urlsafe
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
@@ -204,3 +204,29 @@ def get_invitation(
     get_community(community_id, db, user)
     community = db.get(Community, community_id)
     return {"invite_token": community.invite_token}
+
+
+@router.post("/{community_id}/leave", status_code=204)
+def leave_community(
+    community_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Response:
+    community = db.get(Community, community_id)
+    if community is None:
+        raise HTTPException(status_code=404, detail="Сообщество не найдено")
+    if community.owner_id == user.id:
+        raise HTTPException(status_code=409, detail="Владелец не может покинуть своё сообщество")
+
+    membership = db.scalar(select(Membership).where(
+        Membership.user_id == user.id, Membership.community_id == community_id))
+    if membership is None:
+        raise HTTPException(status_code=403, detail="Вы не являетесь участником группы")
+
+    # Голоса ушедшего больше не влияют на рейтинг; его треки остаются в плейлисте
+    db.execute(delete(Vote).where(
+        Vote.user_id == user.id,
+        Vote.track_id.in_(select(Track.id).where(Track.community_id == community_id))))
+    db.delete(membership)
+    db.commit()
+    return Response(status_code=204)

@@ -36,6 +36,10 @@ export function createWorkspaceApi(services, { storage = null, privateStorage = 
     async get(id, options) { return remember(await services.playlists.get(id, options)); },
     async create(data) { return remember(await services.playlists.create(data)); },
     async join(token) { return remember(await services.playlists.join(token), token); },
+    async leave(id) {
+      await services.playlists.leave(id);
+      known = known.filter((item) => item !== id); delete invitations[id]; save();
+    },
     async invitation(id) {
       if (capabilities.invitation) return services.playlists.invitation(id);
       if (invitations[id]) return { invite_token: invitations[id] };

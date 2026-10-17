@@ -20,6 +20,9 @@ export function createPlaylistApi(request, paths) {
     async get(id, { signal } = {}) {
       return normalize(await request(paths.getPlaylist(id), { signal }));
     },
+    leave(id) {
+      return request(`/communities/${encodeURIComponent(id)}/leave`, { method: "POST" });
+    },
     async join(inviteToken, { signal } = {}) {
       const token = inviteToken.trim();
       if (!token) throw new Error("Введите код приглашения");

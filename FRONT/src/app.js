@@ -33,6 +33,8 @@ const icons = {
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
   check: '<path d="m5 12 4 4L20 5"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.1"/>',
+  trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
+  shuffle: '<path d="M3 7h3c5 0 7 10 12 10h3M3 17h3c2 0 3.4-1.4 4.6-3.2M21 7h-3c-2 0-3.4 1.4-4.6 3.2M18 4l3 3-3 3M18 14l3 3-3 3"/>',
 };
 const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.music}</svg>`;
 const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -124,7 +126,7 @@ function render() {
     <div class="sidebar-label">Библиотека</div><button class="nav-item ${state.overview || !group ? 'active' : ''}" data-action="overview">${icon('grid')}Мои сообщества<span class="nav-count">${state.groups.length}</span></button><button class="nav-item" data-action="join">${icon('link')}Вступить по ссылке</button>
     <div class="sidebar-label community-label">Сообщества<button class="text-button" data-action="create" aria-label="Создать сообщество">${icon('plus')}</button></div><div class="community-nav">${state.groups.length ? state.groups.map((g) => `<button class="community-link ${group?.id === g.id ? 'active' : ''}" data-action="open-group" data-id="${g.id}"><span class="community-dot">${escape(initials(g.name))}</span><span>${escape(g.name)}</span></button>`).join('') : '<p class="sidebar-empty">Здесь появятся твои сообщества.</p>'}</div>
     <div class="sidebar-bottom"><div class="profile"><div class="avatar">${escape(initials(state.profile.username))}</div><div class="profile-text"><strong>${escape(state.profile.username)}</strong><small>Личный аккаунт</small></div><button class="icon-btn" data-action="logout" aria-label="Выйти из аккаунта">${icon('logout')}</button></div></div></aside>
-    <main class="workspace"><header class="topbar"><button class="icon-btn mobile-menu" data-action="menu" aria-label="Меню" aria-controls="sidebar" aria-expanded="false">${icon('menu')}</button><div class="breadcrumbs"><button data-action="overview">Мои сообщества</button>${group ? `<span>/</span><strong>${escape(group.name)}</strong>` : ''}</div><button class="btn secondary small" data-action="${group ? 'share' : 'join'}">${icon(group ? 'users' : 'link')}${group ? 'Пригласить друзей' : 'Вступить'}</button></header>
+    <main class="workspace"><header class="topbar"><button class="icon-btn mobile-menu" data-action="menu" aria-label="Меню" aria-controls="sidebar" aria-expanded="false">${icon('menu')}</button><div class="breadcrumbs"><button data-action="overview">Мои сообщества</button>${group ? `<span>/</span><strong>${escape(group.name)}</strong>` : ''}</div>${group && group.ownerId !== state.profile.id ? `<button class="btn secondary small topbar-leave" data-action="leave" aria-label="Покинуть сообщество" title="Покинуть сообщество">${icon('logout')}<span class="leave-label">Покинуть</span></button>` : ''}<button class="btn secondary small" data-action="${group ? 'share' : 'join'}">${icon(group ? 'users' : 'link')}${group ? 'Пригласить друзей' : 'Вступить'}</button></header>
     <div class="content"><div class="section-heading"><div class="heading-identity">${group ? `<div class="group-cover" aria-hidden="true"><span>${escape(initials(group.name))}</span></div>` : ''}<div class="heading-text">${group ? '<div class="eyebrow">Общий плейлист</div>' : ''}<h1>${escape(group?.name || 'Мои сообщества')}</h1><p>${group ? `${plural(group.membersCount, ['участник', 'участника', 'участников'])} <span class="middle-dot">·</span> ${plural(state.tracks.length, ['трек', 'трека', 'треков'])}` : 'Всё, что вы любите слушать. Вместе.'}</p></div></div><button class="btn" data-action="${group ? 'add-track' : 'create'}">${icon('plus')}${group ? 'Добавить трек' : 'Создать сообщество'}</button></div>
     ${state.error ? `<div class="empty-state error-state"><div class="empty-icon">${icon('info')}</div><h3>Не получилось загрузить данные</h3><p>${escape(state.error)}</p><button class="btn secondary" data-action="refresh">${icon('refresh')}Попробовать снова</button></div>` : state.overview || !group ? overview() : playlist()}
     ${signature()}</div></main></div>`;
@@ -157,9 +159,12 @@ function renderRows() {
     return;
   }
   const playback = player.snapshot();
-  container.innerHTML = rows.map((track, i) => `<div class="track-row ${playback.track?.id === track.id ? 'current-track' : ''}"><button class="track-play ${playback.track?.id === track.id && playback.playing ? 'is-playing' : ''}" aria-label="${playback.track?.id === track.id && playback.playing ? 'Пауза' : 'Слушать'}: ${escape(track.title)}" data-play="${track.id}" ${track.file_url ? '' : 'disabled'} title="${track.file_url ? 'Слушать MP3' : 'К этому треку пока не прикреплён MP3'}">${playback.track?.id === track.id && playback.loading ? '<span class="audio-spinner"></span>' : icon(playback.track?.id === track.id && playback.playing ? 'pause' : 'play')}</button><div class="track-main"><div class="track-cover c${track.id % 6}" aria-hidden="true"><span>${escape(initials(track.title))}</span></div><div class="track-text"><strong title="${escape(track.title)}">${escape(track.title)}</strong><small title="${escape(track.artist)}">${escape(track.artist)}</small>${!track.file_url && (track.added_by === state.profile?.id || state.group?.ownerId === state.profile?.id) ? `<button class="attach-audio" data-attach="${track.id}">${icon('upload')}Добавить MP3</button>` : ''}</div></div><div class="vote-control" aria-label="Голосование за ${escape(track.title)}"><button class="${track.my_vote === 1 ? 'selected' : ''}" aria-label="Нравится: ${escape(track.title)}" aria-pressed="${track.my_vote === 1}" data-vote="1" data-id="${track.id}" ${state.votes.has(track.id) ? 'disabled' : ''}>${icon('up')}</button><span class="vote-score ${track.score > 0 ? 'positive' : ''}">${track.score}</span><button class="negative ${track.my_vote === -1 ? 'selected' : ''}" aria-label="Не нравится: ${escape(track.title)}" aria-pressed="${track.my_vote === -1}" data-vote="-1" data-id="${track.id}" ${state.votes.has(track.id) ? 'disabled' : ''}>${icon('down')}</button></div></div>`).join('');
+  const canManage = (track) => track.added_by === state.profile?.id || state.group?.ownerId === state.profile?.id;
+  const voteLock = (track) => state.votes.has(track.id) ? 'disabled' : track.added_by === state.profile?.id ? 'disabled title="За свой трек голосовать нельзя"' : '';
+  container.innerHTML = rows.map((track, i) => `<div class="track-row ${playback.track?.id === track.id ? 'current-track' : ''}"><button class="track-play ${playback.track?.id === track.id && playback.playing ? 'is-playing' : ''}" aria-label="${playback.track?.id === track.id && playback.playing ? 'Пауза' : 'Слушать'}: ${escape(track.title)}" data-play="${track.id}" ${track.file_url ? '' : 'disabled'} title="${track.file_url ? 'Слушать MP3' : 'К этому треку пока не прикреплён MP3'}">${playback.track?.id === track.id && playback.loading ? '<span class="audio-spinner"></span>' : icon(playback.track?.id === track.id && playback.playing ? 'pause' : 'play')}</button><div class="track-main"><div class="track-cover c${track.id % 6}" aria-hidden="true"><span>${escape(initials(track.title))}</span></div><div class="track-text"><strong title="${escape(track.title)}">${escape(track.title)}</strong><small title="${escape(track.artist)}">${escape(track.artist)}</small>${canManage(track) ? `<span class="track-actions">${!track.file_url ? `<button class="attach-audio" data-attach="${track.id}">${icon('upload')}Добавить MP3</button>` : ''}<button class="track-delete" data-delete="${track.id}" aria-label="Удалить трек: ${escape(track.title)}">${icon('trash')}Удалить</button></span>` : ''}</div></div><div class="vote-control" aria-label="Голосование за ${escape(track.title)}"><button class="${track.my_vote === 1 ? 'selected' : ''}" aria-label="Нравится: ${escape(track.title)}" aria-pressed="${track.my_vote === 1}" data-vote="1" data-id="${track.id}" ${voteLock(track)}>${icon('up')}</button><span class="vote-score ${track.score > 0 ? 'positive' : ''}">${track.score}</span><button class="negative ${track.my_vote === -1 ? 'selected' : ''}" aria-label="Не нравится: ${escape(track.title)}" aria-pressed="${track.my_vote === -1}" data-vote="-1" data-id="${track.id}" ${voteLock(track)}>${icon('down')}</button></div></div>`).join('');
   container.querySelectorAll('[data-play]').forEach((button) => button.onclick = () => { const track = state.tracks.find((item) => item.id === Number(button.dataset.play)); if (track?.file_url) player.play({ ...track, community_id: state.group.id }, ordered.map((item) => ({ ...item, community_id: state.group.id }))); });
   container.querySelectorAll('[data-attach]').forEach((button) => button.onclick = () => showAttachAudio(Number(button.dataset.attach)));
+  container.querySelectorAll('[data-delete]').forEach((button) => button.onclick = () => showDeleteTrack(Number(button.dataset.delete)));
   container.querySelectorAll('[data-vote]').forEach((button) => button.onclick = () => vote(Number(button.dataset.id), Number(button.dataset.vote)));
 }
 
@@ -286,6 +291,27 @@ function showAttachAudio(id) {
   bindFileField();
 }
 
+function showDeleteTrack(id) {
+  const track = state.tracks.find((item) => item.id === id);
+  if (!track || !state.group) return;
+  const groupId = state.group.id;
+  dialog('Удалить трек?', `«${track.title}» — ${track.artist}. Голоса за него и MP3 тоже удалятся.`, '', async () => {
+    await services.tracks.remove(id);
+    if (player.snapshot().track?.id === id) player.stop();
+    modal.close(); toast('Трек удалён'); await load({ groupId, overview: false });
+  }, 'Удалить');
+}
+
+function showLeave() {
+  const group = state.group;
+  if (!group) return;
+  dialog('Покинуть сообщество?', `Ты выйдешь из «${group.name}». Твои голоса перестанут учитываться, добавленные треки останутся. Вернуться можно по приглашению.`, '', async () => {
+    await workspace.leave(group.id);
+    if (player.snapshot().track?.community_id === group.id) player.stop();
+    modal.close(); toast('Ты покинул сообщество'); routeGroup(null);
+  }, 'Покинуть');
+}
+
 async function showShare() {
   const group = state.group; if (!group) return;
   try {
@@ -325,6 +351,7 @@ function action(name, id) {
     case 'join': return showJoin();
     case 'add-track': return showAddTrack();
     case 'share': return showShare();
+    case 'leave': return showLeave();
     case 'open-group': return routeGroup(Number(id));
     case 'overview': return routeGroup(null);
     case 'refresh': return load();
@@ -336,6 +363,22 @@ function action(name, id) {
     }
   }
 }
+
+// Голоса других участников подтягиваются сами, без кнопки «Обновить»
+async function refreshTracks() {
+  const group = state.group;
+  if (!group || !state.profile || state.overview || state.loading || state.error || state.votes.size || modal.open || document.hidden) return;
+  const epoch = state.epoch;
+  try {
+    const tracks = await workspace.tracks(group.id);
+    if (epoch !== state.epoch || state.group?.id !== group.id || state.votes.size) return;
+    const print = (list) => JSON.stringify(list.map((t) => [t.id, t.score, t.my_vote, t.file_url, t.title, t.artist]));
+    if (print(tracks) === print(state.tracks)) return;
+    state.tracks = tracks; renderRows();
+    const badge = document.querySelector('.count-badge'); if (badge) badge.textContent = tracks.length;
+  } catch { /* не страшно: попробуем через 5 секунд */ }
+}
+setInterval(refreshTracks, 5000);
 
 services.session.subscribe(() => {
   if (!services.session.getSnapshot().token) player.stop();

@@ -433,3 +433,14 @@ dialog::backdrop { background: #070c08a8; }
  .has-player { padding-bottom: 139px; }
  .has-player .toasts { bottom: 142px; }
 }
+
+/* Удаление трека, выход из сообщества, перемешивание */
+.track-actions { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.track-delete { background: none; padding: 2px 0 0; display: inline-flex; align-items: center; gap: 5px; color: #b98f7a; font-size: 9px; }
+.track-delete:hover { color: #e3b59c; }
+.track-delete svg { width: 11px; height: 11px; }
+.topbar-leave { margin-left: auto; }
+.player-shuffle.active { color: #d3e9ac; }
+.player-shuffle.active::after { content: ''; display: block; width: 4px; height: 4px; margin: 2px auto 0; border-radius: 50%; background: currentColor; }
+.vote-control button:disabled[title] { cursor: not-allowed; }
+@media (max-width: 760px) { .topbar-leave .leave-label { display: none; } .topbar-leave { gap: 0; } }

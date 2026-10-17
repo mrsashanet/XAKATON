@@ -25,6 +25,9 @@ export function createTracksApi(request) {
     audio(trackId, { signal } = {}) {
       return request(`/tracks/${encodeURIComponent(trackId)}/audio`, { responseType: 'blob', signal });
     },
+    remove(trackId) {
+      return request(`/tracks/${encodeURIComponent(trackId)}`, { method: 'DELETE' });
+    },
     vote(trackId, value) {
       if (![0, 1, -1].includes(value)) throw new Error('Недопустимое значение голоса');
       return request(`/tracks/${encodeURIComponent(trackId)}/vote`, { method: 'POST', json: { value } });

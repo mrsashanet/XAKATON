@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, File, Form, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, File, Form, Response, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import SQLAlchemyError
 from audio_storage import save_mp3, audio_path
@@ -59,6 +59,8 @@ def vote(track_id: int, data: VoteCreate, db: Session = Depends(get_db), user: U
 
     if membership is None:
         raise HTTPException(status_code=403, detail="вы не являетесь участником группы")
+    if track.added_by == user.id:
+        raise HTTPException(status_code=403, detail="Нельзя голосовать за свой трек")
     #Проверка голосовал ли пользователь
     existing = db.scalar(select(Vote).where(Vote.user_id == user.id ,Vote.track_id == track_id))
 
@@ -158,3 +160,25 @@ def get_audio(
         filename=track.title + ".mp3",
         content_disposition_type="inline",
         headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+
+
+@router.delete("/{track_id}", status_code=204)
+def delete_track(
+    track_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)) -> Response:
+    # get_track сам вернёт 404 (нет трека) или 403 (не участник сообщества)
+    track = get_track(track_id, db, user)
+    community = db.get(Community, track.community_id)
+    if track.added_by != user.id and community.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Удалить трек может автор или владелец сообщества")
+
+    file_url = track.file_url
+    db.delete(track)  # голоса за трек удалятся вместе с ним (cascade в модели)
+    db.commit()
+    if file_url:
+        try:
+            audio_path(file_url).unlink(missing_ok=True)
+        except HTTPException:
+            pass  # путь к файлу некорректный — удалять нечего
+    return Response(status_code=204)

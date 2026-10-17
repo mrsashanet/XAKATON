@@ -1,5 +1,5 @@
-export function createPlayer({ audio, tracksApi, getToken, onChange = () => {}, onError = () => {}, urls = URL }) {
-  let state = { track: null, queue: [], loading: false, playing: false, time: 0, duration: 0, volume: .65 };
+export function createPlayer({ audio, tracksApi, getToken, onChange = () => {}, onError = () => {}, urls = URL, random = Math.random }) {
+  let state = { track: null, queue: [], loading: false, playing: false, time: 0, duration: 0, volume: .65, shuffle: false, history: [] };
   let controller, objectUrl, revision = 0;
   audio.volume = state.volume;
   const emit = () => onChange({ ...state });
@@ -42,6 +42,19 @@ export function createPlayer({ audio, tracksApi, getToken, onChange = () => {}, 
     next(direction = 1) {
       if (!state.track || !state.queue.length) return;
       if (direction < 0 && audio.currentTime > 3) { api.seek(0); return; }
+      if (state.shuffle) {
+        if (direction < 0) {
+          // «Назад» в режиме перемешивания — к тому треку, что играл до этого
+          const previous = state.queue.find((track) => track.id === state.history.at(-1));
+          if (!previous) return;
+          state.history = state.history.slice(0, -1);
+          return api.play(previous, state.queue);
+        }
+        const others = state.queue.filter((track) => track.id !== state.track.id);
+        if (!others.length) return;
+        state.history = [...state.history, state.track.id].slice(-50);
+        return api.play(others[Math.floor(random() * others.length)], state.queue);
+      }
       const index = state.queue.findIndex((track) => track.id === state.track.id);
       const track = state.queue[index + direction];
       if (track) return api.play(track, state.queue);
@@ -51,13 +64,14 @@ export function createPlayer({ audio, tracksApi, getToken, onChange = () => {}, 
       audio.currentTime = Math.max(0, Math.min(Number(time), audio.duration));
       state.time = audio.currentTime; emit();
     },
+    toggleShuffle() { state.shuffle = !state.shuffle; state.history = []; emit(); },
     volume(value) { audio.volume = Math.max(0, Math.min(1, Number(value))); state.volume = audio.volume; emit(); },
     setQueue(queue, communityId) {
       if (state.track?.community_id === communityId) { state.queue = queue.filter((track) => track.file_url); emit(); }
     },
     stop() {
       ++revision; controller?.abort(); release();
-      state = { ...state, track: null, queue: [], loading: false, playing: false, time: 0, duration: 0 }; emit();
+      state = { ...state, track: null, queue: [], loading: false, playing: false, time: 0, duration: 0, history: [] }; emit();
     },
   };
   audio.addEventListener('play', () => { state.playing = true; emit(); });
@@ -76,10 +90,11 @@ export function createPlayer({ audio, tracksApi, getToken, onChange = () => {}, 
 }
 
 export function mountPlayer({ host, player, icon }) {
-  host.innerHTML = `<div class="player-track"><span class="player-cover" aria-hidden="true"></span><div><strong id="player-title"></strong><span id="player-artist"></span></div></div><div class="player-center"><div class="player-buttons"><button class="player-skip" id="player-prev" aria-label="Предыдущий трек">${icon('previous')}</button><button class="player-toggle" id="player-toggle" aria-label="Пауза">${icon('play')}</button><button class="player-skip" id="player-next" aria-label="Следующий трек">${icon('next')}</button></div><div class="player-timeline"><output id="player-time">0:00</output><input type="range" id="player-seek" min="0" max="0" value="0" step="0.1" aria-label="Позиция воспроизведения"><output id="player-duration">0:00</output></div></div><div class="player-extra"><label class="player-volume">${icon('volume')}<input type="range" id="player-volume" min="0" max="1" step="0.01" value="0.65" aria-label="Громкость"></label><button class="player-close" id="player-close" aria-label="Закрыть плеер">${icon('close')}</button></div>`;
+  host.innerHTML = `<div class="player-track"><span class="player-cover" aria-hidden="true"></span><div><strong id="player-title"></strong><span id="player-artist"></span></div></div><div class="player-center"><div class="player-buttons"><button class="player-skip player-shuffle" id="player-shuffle" aria-label="Перемешать" aria-pressed="false" title="Перемешать">${icon('shuffle')}</button><button class="player-skip" id="player-prev" aria-label="Предыдущий трек">${icon('previous')}</button><button class="player-toggle" id="player-toggle" aria-label="Пауза">${icon('play')}</button><button class="player-skip" id="player-next" aria-label="Следующий трек">${icon('next')}</button></div><div class="player-timeline"><output id="player-time">0:00</output><input type="range" id="player-seek" min="0" max="0" value="0" step="0.1" aria-label="Позиция воспроизведения"><output id="player-duration">0:00</output></div></div><div class="player-extra"><label class="player-volume">${icon('volume')}<input type="range" id="player-volume" min="0" max="1" step="0.01" value="0.65" aria-label="Громкость"></label><button class="player-close" id="player-close" aria-label="Закрыть плеер">${icon('close')}</button></div>`;
   const $ = (selector) => host.querySelector(selector);
   const format = (value) => { const seconds = Math.max(0, Math.floor(value || 0)); return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; };
   $('#player-toggle').onclick = () => player.toggle();
+  $('#player-shuffle').onclick = () => player.toggleShuffle();
   $('#player-prev').onclick = () => player.next(-1);
   $('#player-next').onclick = () => player.next(1);
   $('#player-close').onclick = () => player.stop();
@@ -98,8 +113,11 @@ export function mountPlayer({ host, player, icon }) {
     $('#player-toggle').setAttribute('aria-label', state.loading ? 'Загрузка аудио' : state.playing ? 'Пауза' : 'Продолжить');
     $('#player-toggle').setAttribute('aria-pressed', String(state.playing));
     const index = state.queue.findIndex((track) => track.id === state.track.id);
-    $('#player-prev').disabled = state.loading || (index <= 0 && state.time <= 3);
-    $('#player-next').disabled = state.loading || index < 0 || index === state.queue.length - 1;
+    $('#player-shuffle').classList.toggle('active', state.shuffle);
+    $('#player-shuffle').setAttribute('aria-pressed', String(state.shuffle));
+    $('#player-shuffle').disabled = state.queue.length < 2;
+    $('#player-prev').disabled = state.loading || (state.shuffle ? !state.history.length : index <= 0) && state.time <= 3;
+    $('#player-next').disabled = state.loading || (state.shuffle ? state.queue.length < 2 : index < 0 || index === state.queue.length - 1);
     $('#player-time').textContent = format(state.time); $('#player-duration').textContent = format(state.duration);
     $('#player-seek').max = state.duration; $('#player-seek').value = state.time;
     $('#player-seek').disabled = !state.duration || state.loading;
